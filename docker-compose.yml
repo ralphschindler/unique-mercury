@@ -1,0 +1,60 @@
+version: '3'
+
+services:
+
+  web:
+    image: elephantbox/elephantbox:p80n16-202110
+    command: run-services nginx,php-fpm
+    environment:
+      APP_ENV: local
+      APP_NAME: unique-mercury
+    ports:
+      - 8082:80
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/storage/framework/cache:size=50m
+      - /app/storage/framework/sessions:size=10m
+
+  mysql:
+    image: mysql:5.7.12
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: unique_mercury
+      MYSQL_USER: unique_mercury
+      MYSQL_PASSWORD: unique_mercury
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+
+  kafka:
+    image: wurstmeister/kafka
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 500M
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.15.0
+    ports:
+      - 8088:8088
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: "kafka:9092"
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:0.15.0
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
